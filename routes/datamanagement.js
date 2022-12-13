@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////
 // Copyright (c) Autodesk, Inc. All rights reserved
-// Written by Forge Partner Development
+// Written by Autodesk Partner Development
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted,
@@ -32,6 +32,21 @@ const {
 
 let router = express.Router();
 
+
+
+///////////////////////////////////////////////////////////////////////
+/// Middleware for obtaining a token for each request.
+///////////////////////////////////////////////////////////////////////
+router.use(async (req, res, next) => {
+    const oauth = new OAuth(req.session);
+    const credentials = await oauth.getInternalToken();
+    if( credentials ){
+        req.oauth_client = oauth.getClient()
+        req.oauth_token = credentials;     
+        next();       
+    }
+});
+
 router.get('/datamanagement', async (req, res) => {
     // The id querystring parameter contains what was selected on the UI tree, make sure it's valid
     const href = decodeURIComponent(req.query.id);
@@ -40,12 +55,9 @@ router.get('/datamanagement', async (req, res) => {
         return;
     }
 
-    // Get the access token
-    const oauth = new OAuth(req.session);
-    const internalToken = await oauth.getInternalToken();
     if (href === '#') {
         // If href is '#', it's the root tree node
-        getHubs(oauth.getClient(), internalToken, res);
+        getHubs(req.oauth_client, req.oauth_token, res);
     } else {
         // Otherwise let's break it by '/'
         const params = href.split('/');
@@ -53,17 +65,17 @@ router.get('/datamanagement', async (req, res) => {
         const resourceId = params[params.length - 1];
         switch (resourceName) {
             case 'hubs': {
-                getProjects(resourceId, oauth.getClient(), internalToken, res);
+                getProjects(resourceId, req.oauth_client, req.oauth_token, res);
                 break;
             }
             case 'projects':{
                 const projectId = resourceId.split('b.').join('');
-                getPackages( projectId, internalToken, res );
+                getPackages( projectId, req.oauth_token, res );
                 break;
             }
             case 'packages':{
                 const projectId = params[params.length - 3];
-                getTakeoffItems(projectId, resourceId, internalToken, res);
+                getTakeoffItems(projectId, resourceId, req.oauth_token, res);
                 break;
             }
         }
